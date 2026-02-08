@@ -1,45 +1,18 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link } from 'react-router-dom';
-import { useAppState } from '../state';
+import { useAppState } from '../App';
 import { TaskStatus } from '../types';
-import { GoogleGenAI } from "@google/genai";
 
 const ApplicationsPage: React.FC = () => {
   const { tasks, reviewApplication, verifySubmission, rejectSubmission } = useAppState();
   const [activeTab, setActiveTab] = useState<'pending' | 'review'>('pending');
-  const [analyzingId, setAnalyzingId] = useState<string | null>(null);
-  const [aiInsights, setAiInsights] = useState<Record<string, { score: number, reasoning: string }>>({});
   
   // Logic: Split queue into New Applicants vs Work to Review
   const newApplicants = tasks.filter(t => t.status === TaskStatus.PENDING);
   const workInReview = tasks.filter(t => t.status === TaskStatus.IN_REVIEW);
 
   const displayQueue = activeTab === 'pending' ? newApplicants : workInReview;
-
-  const runAiAnalysis = async (taskId: string, pitch: string, missionTitle: string) => {
-    if (!pitch) return;
-    setAnalyzingId(taskId);
-    try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-      const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
-        contents: `Act as an expert talent recruiter for a social enterprise. 
-        Analyze this volunteer application for the mission: "${missionTitle}". 
-        Volunteer Pitch: "${pitch}".
-        Provide a compatibility score (0-100) based on professional alignment and passion. 
-        Also provide a very brief professional reasoning (max 15 words).
-        Return ONLY a JSON object: {"score": number, "reasoning": "string"}`,
-        config: { responseMimeType: 'application/json' }
-      });
-      const data = JSON.parse(response.text || '{"score": 50, "reasoning": "Standard alignment."}');
-      setAiInsights(prev => ({ ...prev, [taskId]: data }));
-    } catch (error) {
-      console.error(error);
-    } finally {
-      setAnalyzingId(null);
-    }
-  };
 
   return (
     <div className="max-w-[1400px] mx-auto px-6 py-12 space-y-12 pb-32">
@@ -133,53 +106,6 @@ const ApplicationsPage: React.FC = () => {
                   </div>
 
                   <div className="space-y-6">
-                    {/* AI Vetting Insights */}
-                    <div className="p-6 bg-blue-500/5 rounded-3xl border border-blue-500/10 space-y-4">
-                       <div className="flex items-center justify-between">
-                         <h5 className="text-[10px] font-black text-blue-500 uppercase tracking-widest flex items-center gap-2">
-                           <span className="material-symbols-outlined text-sm">psychology</span> AI Vetting Insight
-                         </h5>
-                         {!aiInsights[task.id] && activeTab === 'pending' && (
-                           <button 
-                            disabled={analyzingId === task.id}
-                            onClick={() => runAiAnalysis(task.id, task.applicationDetails?.pitch || '', task.title)}
-                            className="text-[9px] font-black text-blue-500 underline uppercase tracking-widest disabled:opacity-30"
-                           >
-                            {analyzingId === task.id ? 'Analyzing...' : 'Analyze with AI'}
-                           </button>
-                         )}
-                       </div>
-                       
-                       <AnimatePresence mode="wait">
-                         {aiInsights[task.id] ? (
-                           <motion.div 
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="space-y-3"
-                           >
-                            <div className="flex items-center gap-4">
-                              <div className="text-2xl font-black text-slate-900 dark:text-white">{aiInsights[task.id].score}%</div>
-                              <div className="h-1.5 flex-1 bg-slate-200 dark:bg-white/10 rounded-full overflow-hidden">
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${aiInsights[task.id].score}%` }}
-                                  className="h-full bg-blue-500" 
-                                />
-                              </div>
-                            </div>
-                            <p className="text-[11px] font-bold text-slate-500 leading-relaxed italic">
-                              "{aiInsights[task.id].reasoning}"
-                            </p>
-                           </motion.div>
-                         ) : (
-                           <div className="flex flex-col items-center justify-center py-4 opacity-20">
-                             <span className="material-symbols-outlined text-4xl mb-2">neurology</span>
-                             <p className="text-[9px] font-black uppercase">Vetting Analysis Idle</p>
-                           </div>
-                         )}
-                       </AnimatePresence>
-                    </div>
-
                     <div className="space-y-2">
                       <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest">{activeTab === 'pending' ? 'Attached Docs' : 'Evidence Link'}</h5>
                       <div className="space-y-3">
